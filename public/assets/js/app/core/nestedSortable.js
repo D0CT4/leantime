@@ -1,3 +1,29 @@
+/**
+ * Leantime Nested Sortable jQuery Plugin
+ * 
+ * This plugin provides advanced drag-and-drop functionality for hierarchical todo lists
+ * with the following features:
+ * 
+ * - Hierarchical task nesting with type validation
+ * - Cross-group dragging with automatic field updates
+ * - Project-based access control
+ * - Integration with calendar and pomodoro timer
+ * - Real-time visual feedback during drag operations
+ * - Automatic HTMX-based persistence
+ * 
+ * Usage:
+ * jQuery('.sortable-list').nestedSortable();
+ * 
+ * Data attributes required:
+ * - data-item-type: Type of item (task, milestone, subtask)
+ * - data-id: Unique identifier
+ * - data-project: Project ID for access control
+ * - data-group-key: Group identifier for cross-group moves
+ * - data-container-type: Container type for nesting validation
+ * 
+ * @version 1.0.0
+ * @author Leantime Team
+ */
 (function($) {
 
     $.fn.nestedSortable = function(options) {
