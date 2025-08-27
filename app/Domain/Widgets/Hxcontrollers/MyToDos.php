@@ -82,7 +82,7 @@ class MyToDos extends HtmxController
      */
     public function saveSorting($params)
     {
-        $post = $_POST;
+        $post = $this->incomingRequest->request->all();
         $userId = session('userdata.id');
         unset($params['act']);
 
@@ -163,6 +163,13 @@ class MyToDos extends HtmxController
         $successCount = 0;
         $errorCount = 0;
 
+        // Validate groupBy parameter
+        if (! in_array($groupBy, ['time', 'project', 'priority'])) {
+            Log::warning("Invalid groupBy parameter: {$groupBy}");
+            $this->tpl->setNotification($this->language->__('notifications.group_changes_failed'), 'error');
+            return;
+        }
+
         foreach ($groupChanges as $change) {
             $taskId = $change['id'] ?? null;
             $toGroup = $change['toGroup'] ?? null;
@@ -171,15 +178,21 @@ class MyToDos extends HtmxController
             // Skip invalid changes
             if (empty($taskId) || empty($toGroup)) {
                 $errorCount++;
+                Log::warning("Invalid group change data: missing taskId or toGroup");
+                continue;
+            }
 
+            // Validate taskId is numeric
+            if (! is_numeric($taskId)) {
+                $errorCount++;
+                Log::warning("Invalid taskId: {$taskId}");
                 continue;
             }
 
             // Validate that user has permission to update this task
-            if (! $this->canUserUpdateTask($taskId)) {
+            if (! $this->canUserUpdateTask((int) $taskId)) {
                 Log::warning("User does not have permission to update task {$taskId}");
                 $errorCount++;
-
                 continue;
             }
 
@@ -204,6 +217,7 @@ class MyToDos extends HtmxController
                 }
             } else {
                 // No valid field mapping found
+                $errorCount++;
                 Log::warning("No valid field mapping found for group {$toGroup} in groupBy {$groupBy}");
             }
         }
@@ -403,6 +417,18 @@ class MyToDos extends HtmxController
             $ticketId = $params['id'];
             $status = $params['status'];
 
+            // Validate input
+            if (! is_numeric($ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.status_update_error'), 'error');
+                return;
+            }
+
+            // Validate user has permission to update this task
+            if (! $this->canUserUpdateTask((int) $ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.status_update_error'), 'error');
+                return;
+            }
+
             $result = $this->ticketsService->patch($ticketId, ['status' => $status]);
 
             if ($result) {
@@ -410,6 +436,8 @@ class MyToDos extends HtmxController
             } else {
                 $this->tpl->setNotification($this->language->__('notifications.status_update_error'), 'error');
             }
+        } else {
+            $this->tpl->setNotification($this->language->__('notifications.status_update_error'), 'error');
         }
     }
 
@@ -424,6 +452,18 @@ class MyToDos extends HtmxController
             $ticketId = $params['id'];
             $milestoneId = $params['milestoneId'];
 
+            // Validate input
+            if (! is_numeric($ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.milestone_update_error'), 'error');
+                return;
+            }
+
+            // Validate user has permission to update this task
+            if (! $this->canUserUpdateTask((int) $ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.milestone_update_error'), 'error');
+                return;
+            }
+
             $result = $this->ticketsService->patch($ticketId, ['milestoneid' => $milestoneId]);
 
             if ($result) {
@@ -431,6 +471,8 @@ class MyToDos extends HtmxController
             } else {
                 $this->tpl->setNotification($this->language->__('notifications.milestone_update_error'), 'error');
             }
+        } else {
+            $this->tpl->setNotification($this->language->__('notifications.milestone_update_error'), 'error');
         }
     }
 
@@ -445,6 +487,18 @@ class MyToDos extends HtmxController
             $ticketId = $params['id'];
             $date = $params['date'];
 
+            // Validate input
+            if (! is_numeric($ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.date_update_error'), 'error');
+                return;
+            }
+
+            // Validate user has permission to update this task
+            if (! $this->canUserUpdateTask((int) $ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.date_update_error'), 'error');
+                return;
+            }
+
             $result = $this->ticketsService->patch($ticketId, ['dateToFinish' => $date]);
 
             if ($result) {
@@ -452,11 +506,13 @@ class MyToDos extends HtmxController
             } else {
                 $this->tpl->setNotification($this->language->__('notifications.date_update_error'), 'error');
             }
+        } else {
+            $this->tpl->setNotification($this->language->__('notifications.date_update_error'), 'error');
         }
     }
 
     /**
-     * Update task due date via HTMX
+     * Update task title via HTMX
      */
     public function updateTitle($params)
     {
@@ -464,16 +520,38 @@ class MyToDos extends HtmxController
             $ticketId = $params['id'];
             $headline = $params['headline'];
 
+            // Validate input
+            if (! is_numeric($ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.title_update_error'), 'error');
+                return '';
+            }
+
+            // Sanitize headline
+            $headline = strip_tags(trim($headline));
+            if (empty($headline)) {
+                $this->tpl->setNotification($this->language->__('notifications.title_update_error'), 'error');
+                return '';
+            }
+
+            // Validate user has permission to update this task
+            if (! $this->canUserUpdateTask((int) $ticketId)) {
+                $this->tpl->setNotification($this->language->__('notifications.title_update_error'), 'error');
+                return '';
+            }
+
             $result = $this->ticketsService->patch($ticketId, ['headline' => $headline]);
 
             if ($result) {
                 $this->tpl->setNotification($this->language->__('notifications.title_updated'), 'success');
+                return $this->tpl->displayRaw(htmlspecialchars($headline, ENT_QUOTES, 'UTF-8'));
             } else {
                 $this->tpl->setNotification($this->language->__('notifications.title_update_error'), 'error');
+                return '';
             }
-
-            return $this->tpl->displayRaw("{$headline}");
         }
+
+        $this->tpl->setNotification($this->language->__('notifications.title_update_error'), 'error');
+        return '';
     }
 
     /**
@@ -481,8 +559,8 @@ class MyToDos extends HtmxController
      */
     public function addSubtask()
     {
-        $params = $_POST;
-        $getParams = $_GET;
+        $params = $this->incomingRequest->request->all();
+        $getParams = $this->incomingRequest->query->all();
 
         // Use the existing subtasks controller to handle the creation
         $ticket = $this->ticketsService->getTicket($getParams['ticketId']);
@@ -500,7 +578,7 @@ class MyToDos extends HtmxController
 
     public function addTodo()
     {
-        $params = $_POST;
+        $params = $this->incomingRequest->request->all();
 
         if (AuthService::userHasRole([Roles::$owner, Roles::$manager, Roles::$editor])) {
             if (isset($params['quickadd']) == true) {
